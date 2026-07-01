@@ -22,7 +22,7 @@ class ResumeEmbedding(Base):
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     
-    embedding = Column(Vector(1536), nullable=True)
+    embedding = Column(Vector(384), nullable=True)
     
     resume = relationship("Resume", back_populates="embeddings")
 
