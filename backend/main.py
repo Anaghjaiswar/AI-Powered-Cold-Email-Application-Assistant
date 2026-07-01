@@ -1,9 +1,20 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
+from database import init_db
 import os
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize pgvector extension on startup
+    try:
+        init_db()
+    except Exception as e:
+        print(f"Warning: Could not initialize database extension: {e}")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 # Mount static files (CSS, JS, assets)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
