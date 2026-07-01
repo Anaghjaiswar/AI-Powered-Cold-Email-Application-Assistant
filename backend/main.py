@@ -3,10 +3,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from database import init_db
+from routes import router as api_router
 import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Run database initialization on startup
     try:
         init_db()
     except Exception as e:
@@ -14,6 +16,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+# Register global API router
+app.include_router(api_router)
 
 # Mount static files (CSS, JS, assets)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
