@@ -31,6 +31,8 @@ class UserSettings(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     groq_api_key = Column(String(255), nullable=True)
+    sender_email = Column(String(255), nullable=True)
+    sender_app_password = Column(String(255), nullable=True)
     email_footer = Column(Text, nullable=True) 
     preferred_tone = Column(String(50), nullable=True)  # Limited options: e.g., professional, conversational, creative, short
     email_length = Column(String(50), nullable=True)    # Limited options: e.g., short, medium, long
