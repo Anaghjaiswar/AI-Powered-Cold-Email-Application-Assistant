@@ -12,27 +12,28 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 
-
+# Global connection objects
 engine = create_engine(DATABASE_URL)
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
+
+
+def drop_tables():
+    import models
+    Base.metadata.drop_all(bind=engine)
+
+
 def init_db():
-    """
-    Initializes the database by enabling the pgvector extension.
-    This should be called at application startup.
-    """
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         conn.commit()
 
+    import models
+    Base.metadata.create_all(bind=engine)
+
+
 def get_db():
-    """
-    FastAPI dependency that provides a transactional database session.
-    Ensures the connection is closed after the request is finished.
-    """
     db = SessionLocal()
     try:
         yield db

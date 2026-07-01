@@ -7,11 +7,10 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize pgvector extension on startup
     try:
         init_db()
     except Exception as e:
-        print(f"Warning: Could not initialize database extension: {e}")
+        print(f"Warning: Could not initialize database: {e}")
     yield
 
 app = FastAPI(lifespan=lifespan)
