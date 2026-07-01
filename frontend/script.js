@@ -841,7 +841,7 @@ function toggleEmailEditMode(isEdit) {
     if (isEdit) {
         container.classList.add('is-editing');
         previewPanel.classList.remove('active');
-        editorPanel.style.display = 'block';
+        editorPanel.classList.add('active');
         modeIndicator.innerText = "EDIT MODE (MARKDOWN)";
         modeIndicator.style.background = "var(--accent-color)";
         modeIndicator.style.color = "#ffffff";
@@ -851,7 +851,7 @@ function toggleEmailEditMode(isEdit) {
     } else {
         container.classList.remove('is-editing');
         previewPanel.classList.add('active');
-        editorPanel.style.display = 'none';
+        editorPanel.classList.remove('active');
         modeIndicator.innerText = "PREVIEW MODE";
         modeIndicator.style.background = "var(--border-color)";
         modeIndicator.style.color = "var(--text-secondary)";
