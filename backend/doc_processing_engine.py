@@ -95,3 +95,10 @@ class DocProcessingEngine:
         final_chunks = self.get_structured_docs(markdown_text)
         self.save_to_postgres(db_session, resume_id, final_chunks)
 
+
+# Load the embeddings model globally on startup (Singleton pattern)
+# This prevents the CPU-heavy model weights from being reloaded on every request
+shared_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+doc_processor = DocProcessingEngine(embeddings=shared_embeddings)
+
+

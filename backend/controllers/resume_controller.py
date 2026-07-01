@@ -3,7 +3,7 @@ import uuid
 from fastapi import UploadFile, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 import models
-from doc_processing_engine import DocProcessingEngine
+from doc_processing_engine import doc_processor
 from database import SessionLocal
 
 
@@ -14,8 +14,7 @@ def process_resume_in_background(resume_id: int, filepath: str):
     db = SessionLocal()
     try:
         # Run Document Processing Engine to convert, chunk, and embed via pgvector
-        engine = DocProcessingEngine()
-        engine.process_pdf(db, resume_id, filepath)
+        doc_processor.process_pdf(db, resume_id, filepath)
         
         # On success, update status to completed
         resume = db.query(models.Resume).filter(models.Resume.id == resume_id).first()
