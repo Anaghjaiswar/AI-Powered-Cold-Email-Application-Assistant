@@ -53,7 +53,8 @@ class LLMEngine:
                 "4. Append the provided dynamic footer exactly at the bottom of the email.\n"
                 "5. Keep the tone humble, confident, value-driven, and alignment-focused, tailored specifically to the user's preferred tone: {preferred_tone}.\n"
                 "6. Write the email to match the user's preferred email length: {email_length}.\n"
-                "7. Do NOT leave any bracketed placeholders (like [Your Name] or [Recipient's Name]) in the final email output. Write naturally if details are missing.\n\n"
+                "7. Do NOT leave any bracketed placeholders (like [Your Name] or [Recipient's Name]) in the final email output. Write naturally if details are missing.\n"
+                "8. Infer the company name directly from the provided job description or company details context to use naturally in the email.\n\n"
                 "USER PREFERENCES:\n"
                 "- Preferred Tone: {preferred_tone}\n"
                 "- Preferred Length: {email_length}\n\n"
@@ -62,13 +63,12 @@ class LLMEngine:
                 "JOB DESCRIPTION:\n{job_description}\n"
                 "COMPANY DETAILS:\n{company_description}"
             )),
-            ("human", "Generate the draft tailored for target recipient: {recipient_email}")
+            ("human", "Generate the cold email draft tailored for this job application based on the provided details.")
         ])
 
         self.prompt = prompt or self.system_prompt
 
-        self.CHAIN = self.prompt | self.llm | StrOutputParser()
-
+        self.chain = self.prompt | self.llm | StrOutputParser()
 
     def generate_email_draft(
         self,
@@ -78,18 +78,16 @@ class LLMEngine:
         company_description: str,
         preferred_tone: str,
         email_length: str,
-        recipient_email: str,
     ) -> str:
         """Generates a cold email draft based on resume, footer, preferences, and job/company details."""
         try:
-            return self.CHAIN.invoke({
+            return self.chain.invoke({
                 "resume_context": resume_context,
                 "footer_context": footer_context,
                 "job_description": job_description,
                 "company_description": company_description,
                 "preferred_tone": preferred_tone,
                 "email_length": email_length,
-                "recipient_email": recipient_email
             })
         except Exception as e:
             raise RuntimeError(f"Error generating email draft: {e}") from e

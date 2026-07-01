@@ -44,3 +44,18 @@ class ResumeSchema(BaseModel):
             }
         }
 
+class GenerateEmailRequest(BaseModel):
+    company_description: Optional[str] = ""
+    job_description: str
+
+class GenerateEmailResponse(BaseModel):
+    subject: str
+    body: str
+
+class SendEmailRequest(BaseModel):
+    recipient_email: str
+    subject: str
+    body: str
+    resume_id: Optional[int] = None
+
+

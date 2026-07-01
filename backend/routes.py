@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from database import get_db
-from schemas import UserSettingsSchema, ResumeSchema
+from schemas import UserSettingsSchema, ResumeSchema, GenerateEmailRequest, GenerateEmailResponse, SendEmailRequest
 from controllers.settings_controller import UserSettingsController
 from controllers.resume_controller import ResumeController
+from controllers.email_controller import EmailController
 from typing import List
 
 router = APIRouter()
@@ -40,3 +41,15 @@ def upload_resume(background_tasks: BackgroundTasks, file: UploadFile = File(...
 @router.delete("/api/resumes/{resume_id}", response_model=ResumeSchema, tags=["resumes"])
 def delete_resume(resume_id: int, db: Session = Depends(get_db)):
     return ResumeController.delete_resume(db, resume_id)
+
+
+# --- EMAIL DRAFTING & SENDING ENDPOINTS ---
+
+@router.post("/api/generate", response_model=GenerateEmailResponse, tags=["emails"])
+def generate_email_draft(req: GenerateEmailRequest, db: Session = Depends(get_db)):
+    return EmailController.generate_email_draft(db, req)
+
+@router.post("/api/send-email", tags=["emails"])
+def send_email(req: SendEmailRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    return EmailController.send_outbound_email(db, req, background_tasks)
+
