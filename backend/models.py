@@ -10,6 +10,8 @@ class Resume(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String(255), nullable=False)
     filepath = Column(String(512), nullable=False)
+    status = Column(String(50), default="processing")
+    error_message = Column(Text, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     embeddings = relationship("ResumeEmbedding", back_populates="resume", cascade="all, delete-orphan")

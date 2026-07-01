@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class UserSettingsSchema(BaseModel):
     groq_api_key: Optional[str] = None
@@ -21,3 +22,25 @@ class UserSettingsSchema(BaseModel):
                 "email_length": "medium"
             }
         }
+
+class ResumeSchema(BaseModel):
+    id: int
+    filename: str
+    filepath: str
+    status: str
+    error_message: Optional[str] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "filename": "my_resume.pdf",
+                "filepath": "/app/assets/1234-5678-my_resume.pdf",
+                "status": "processing",
+                "error_message": None,
+                "uploaded_at": "2026-07-01T08:00:00Z"
+            }
+        }
+

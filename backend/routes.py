@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from database import get_db
-from schemas import UserSettingsSchema
+from schemas import UserSettingsSchema, ResumeSchema
 from controllers.settings_controller import UserSettingsController
+from controllers.resume_controller import ResumeController
+from typing import List
 
 router = APIRouter()
 
@@ -19,3 +21,22 @@ def update_user_settings(settings: UserSettingsSchema, db: Session = Depends(get
 @router.delete("/api/settings", response_model=UserSettingsSchema, tags=["settings"])
 def clear_user_settings(db: Session = Depends(get_db)):
     return UserSettingsController.clear_settings(db)
+
+
+# --- RESUME ENDPOINTS ---
+
+@router.get("/api/resumes", response_model=List[ResumeSchema], tags=["resumes"])
+def list_resumes(db: Session = Depends(get_db)):
+    return ResumeController.list_resumes(db)
+
+@router.get("/api/resumes/{resume_id}", response_model=ResumeSchema, tags=["resumes"])
+def get_resume(resume_id: int, db: Session = Depends(get_db)):
+    return ResumeController.get_resume(db, resume_id)
+
+@router.post("/api/resumes", response_model=ResumeSchema, status_code=201, tags=["resumes"])
+def upload_resume(background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    return ResumeController.create_resume(db, file, background_tasks)
+
+@router.delete("/api/resumes/{resume_id}", response_model=ResumeSchema, tags=["resumes"])
+def delete_resume(resume_id: int, db: Session = Depends(get_db)):
+    return ResumeController.delete_resume(db, resume_id)
