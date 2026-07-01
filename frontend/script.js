@@ -71,16 +71,14 @@ function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
     
-    const sunIcon = document.querySelector('.theme-icon-sun');
-    const moonIcon = document.querySelector('.theme-icon-moon');
+    // Synchronize Sun and Moon icons across floating and sidebar theme toggle buttons
+    document.querySelectorAll('.theme-icon-sun').forEach(sunIcon => {
+        sunIcon.style.display = theme === 'light' ? 'block' : 'none';
+    });
     
-    if (theme === 'light') {
-        sunIcon.style.display = 'block';
-        moonIcon.style.display = 'none';
-    } else {
-        sunIcon.style.display = 'none';
-        moonIcon.style.display = 'block';
-    }
+    document.querySelectorAll('.theme-icon-moon').forEach(moonIcon => {
+        moonIcon.style.display = theme === 'light' ? 'none' : 'block';
+    });
 }
 
 function toggleTheme() {
@@ -155,25 +153,25 @@ function switchFooterTab(tab) {
 
 // --- EVENT LISTENERS REGISTRATION ---
 function setupEventListeners() {
-    // Theme Toggle
+    // Theme Toggle (floating)
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+    
+    // Theme Toggle (sidebar)
+    document.getElementById('sidebar-theme-btn').addEventListener('click', toggleTheme);
     
     // Welcome Page button
     document.getElementById('welcome-start-btn').addEventListener('click', async () => {
         showNotification("Checking configuration...", "warning");
         const hasConfig = await fetchUserSettings();
-        await fetchAndRenderResumes(); // Loads resumes into state
+        await fetchAndRenderResumes();
         
         const hasCompletedResumes = state.resumes.some(r => r.status === "completed");
         
         if (hasConfig && hasCompletedResumes) {
-            // Load dashboard directly if both settings and resumes exist
             loadDashboard();
         } else if (hasConfig) {
-            // Settings configured but no resumes, send to Resumes Setup view
             switchView('resumes-setup');
         } else {
-            // Send user to setup settings first
             switchView('settings');
         }
     });
@@ -187,12 +185,6 @@ function setupEventListeners() {
         document.getElementById('email_footer').value = "";
         switchFooterTab('edit');
         showNotification("Fields cleared", "warning");
-    });
-    
-    // Dashboard header button (Back to Settings)
-    document.getElementById('dash-settings-btn').addEventListener('click', () => {
-        switchView('settings');
-        fetchUserSettings(); // Prefill settings form
     });
     
     // Onboarding Finish button
@@ -223,6 +215,32 @@ function setupEventListeners() {
         const files = dt.files;
         handleOnboardingFiles(files);
     });
+
+    // Setup drag and drop for sidebar drawer upload zone
+    const drawerZone = document.getElementById('drawer-upload-zone');
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        drawerZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            drawerZone.classList.add('dragover');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        drawerZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            drawerZone.classList.remove('dragover');
+        }, false);
+    });
+
+    drawerZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleOnboardingFiles(files);
+    });
+
+    // Drawer Settings Form submit
+    document.getElementById('drawer-settings-form').addEventListener('submit', handleDrawerSettingsFormSubmit);
     
     // Generate email outbound
     document.getElementById('generate-email-btn').addEventListener('click', triggerEmailGeneration);
@@ -251,7 +269,7 @@ async function fetchUserSettings() {
         const data = await res.json();
         state.settings = data;
         
-        // Populate inputs
+        // Populate onboarding settings inputs
         document.getElementById('groq_api_key').value = data.groq_api_key || "";
         document.getElementById('sender_email').value = data.sender_email || "";
         document.getElementById('sender_app_password').value = data.sender_app_password || "";
@@ -259,7 +277,14 @@ async function fetchUserSettings() {
         document.getElementById('preferred_tone').value = data.preferred_tone || "professional";
         document.getElementById('email_length').value = data.email_length || "medium";
         
-        // Return true if API key is already configured
+        // Populate sidebar drawer settings inputs
+        document.getElementById('drawer_groq_api_key').value = data.groq_api_key || "";
+        document.getElementById('drawer_sender_email').value = data.sender_email || "";
+        document.getElementById('drawer_sender_app_password').value = data.sender_app_password || "";
+        document.getElementById('drawer_email_footer').value = data.email_footer || "";
+        document.getElementById('drawer_preferred_tone').value = data.preferred_tone || "professional";
+        document.getElementById('drawer_email_length').value = data.email_length || "medium";
+        
         return !!data.groq_api_key;
     } catch (err) {
         console.error(err);
@@ -290,9 +315,39 @@ async function handleSettingsFormSubmit(e) {
         if (!res.ok) throw new Error("Update configuration failed.");
         
         showNotification("Outbound configuration saved successfully!");
-        // Settings done, transition to Resumes Upload Setup
+        // Refresh local memory settings & go to resumes onboarding
+        await fetchUserSettings();
         switchView('resumes-setup');
         fetchAndRenderResumes();
+    } catch (err) {
+        showNotification(err.message, "error");
+    }
+}
+
+async function handleDrawerSettingsFormSubmit(e) {
+    e.preventDefault();
+    
+    const payload = {
+        groq_api_key: document.getElementById('drawer_groq_api_key').value.trim(),
+        sender_email: document.getElementById('drawer_sender_email').value.trim(),
+        sender_app_password: document.getElementById('drawer_sender_app_password').value.trim(),
+        email_footer: document.getElementById('drawer_email_footer').value,
+        preferred_tone: document.getElementById('drawer_preferred_tone').value,
+        email_length: document.getElementById('drawer_email_length').value
+    };
+    
+    try {
+        const res = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error("Update configuration failed.");
+        
+        showNotification("Sidebar configuration updated successfully!");
+        await fetchUserSettings();
+        closeDrawer();
     } catch (err) {
         showNotification(err.message, "error");
     }
@@ -304,6 +359,54 @@ function loadDashboard() {
     fetchAndRenderResumes();
 }
 
+// --- SIDEBAR DRAWER NAVIGATION CONTROLLERS ---
+function showDashboardSection(section) {
+    // Reset active status from all sidebar nav elements
+    document.querySelectorAll('.sidebar-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const drawer = document.getElementById('side-drawer');
+    const drawerTitle = document.getElementById('drawer-title');
+    
+    const resumesTab = document.getElementById('drawer-resumes-tab');
+    const settingsTab = document.getElementById('drawer-settings-tab');
+    
+    if (section === 'workspace') {
+        document.getElementById('sidebar-btn-workspace').classList.add('active');
+        drawer.classList.remove('active');
+    } else if (section === 'resumes') {
+        document.getElementById('sidebar-btn-resumes').classList.add('active');
+        drawerTitle.innerText = "Resume Manager";
+        
+        resumesTab.style.display = 'block';
+        settingsTab.style.display = 'none';
+        
+        drawer.classList.add('active');
+        fetchAndRenderResumes();
+    } else if (section === 'settings') {
+        document.getElementById('sidebar-btn-settings').classList.add('active');
+        drawerTitle.innerText = "Outbound Settings";
+        
+        resumesTab.style.display = 'none';
+        settingsTab.style.display = 'block';
+        
+        drawer.classList.add('active');
+        fetchUserSettings();
+    }
+}
+
+function closeDrawer() {
+    const drawer = document.getElementById('side-drawer');
+    drawer.classList.remove('active');
+    
+    // Set workspace active by default in the sidebar
+    document.querySelectorAll('.sidebar-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.getElementById('sidebar-btn-workspace').classList.add('active');
+}
+
 // --- RESUME CONTROLLER ACTIONS ---
 async function fetchAndRenderResumes() {
     try {
@@ -313,7 +416,6 @@ async function fetchAndRenderResumes() {
         const resumes = await res.json();
         state.resumes = resumes;
         
-        // Render both dashboard tray and onboarding setup list
         renderResumesTray();
         renderOnboardingResumesList();
         
@@ -383,42 +485,78 @@ function renderResumesTray() {
     updateAttachmentLabel();
 }
 
-// Render Onboarding setup list
+// Render Onboarding setup list AND Drawer list
 function renderOnboardingResumesList() {
     const listContainer = document.getElementById('onboarding-resumes-list');
-    if (!listContainer) return;
+    const drawerList = document.getElementById('drawer-resumes-list');
     
-    if (state.resumes.length === 0) {
-        listContainer.innerHTML = `<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 20px;">No resumes uploaded yet.</p>`;
-        return;
+    // Render onboarding list
+    if (listContainer) {
+        if (state.resumes.length === 0) {
+            listContainer.innerHTML = `<p style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 20px;">No resumes uploaded yet.</p>`;
+        } else {
+            listContainer.innerHTML = "";
+            state.resumes.forEach(resume => {
+                const item = document.createElement('div');
+                item.className = 'onboarding-resume-item';
+                
+                let badgeClass = 'processing';
+                let badgeText = 'Processing...';
+                if (resume.status === 'completed') {
+                    badgeClass = 'completed';
+                    badgeText = 'Completed';
+                } else if (resume.status === 'failed') {
+                    badgeClass = 'failed';
+                    badgeText = `Failed: ${resume.error_message || 'Unknown error'}`;
+                }
+                
+                item.innerHTML = `
+                    <div class="onboarding-resume-info" style="max-width: 80%;">
+                        <span class="onboarding-resume-name" style="word-break: break-all;" title="${resume.filename}">${resume.filename}</span>
+                        <span class="status-badge ${badgeClass}" style="margin-top: 3px;">${badgeText}</span>
+                    </div>
+                    <button class="icon-btn" onclick="deleteResume(${resume.id})" style="color: var(--error-color); border-color: transparent;" title="Delete">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    </button>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
     }
     
-    listContainer.innerHTML = "";
-    state.resumes.forEach(resume => {
-        const item = document.createElement('div');
-        item.className = 'onboarding-resume-item';
-        
-        let badgeClass = 'processing';
-        let badgeText = 'Processing...';
-        if (resume.status === 'completed') {
-            badgeClass = 'completed';
-            badgeText = 'Completed';
-        } else if (resume.status === 'failed') {
-            badgeClass = 'failed';
-            badgeText = `Failed: ${resume.error_message || 'Unknown error'}`;
+    // Render drawer list
+    if (drawerList) {
+        if (state.resumes.length === 0) {
+            drawerList.innerHTML = `<p style="color: var(--text-secondary); font-style: italic; font-size: 0.85rem; text-align: center;">No resumes uploaded.</p>`;
+        } else {
+            drawerList.innerHTML = "";
+            state.resumes.forEach(resume => {
+                const item = document.createElement('div');
+                item.className = 'onboarding-resume-item';
+                
+                let badgeClass = 'processing';
+                let badgeText = 'Processing...';
+                if (resume.status === 'completed') {
+                    badgeClass = 'completed';
+                    badgeText = 'Completed';
+                } else if (resume.status === 'failed') {
+                    badgeClass = 'failed';
+                    badgeText = 'Failed';
+                }
+                
+                item.innerHTML = `
+                    <div class="onboarding-resume-info" style="max-width: 80%;">
+                        <span class="onboarding-resume-name" style="word-break: break-all;" title="${resume.filename}">${resume.filename}</span>
+                        <span class="status-badge ${badgeClass}" style="margin-top: 3px;">${badgeText}</span>
+                    </div>
+                    <button class="icon-btn" onclick="deleteResume(${resume.id})" style="color: var(--error-color); border-color: transparent;" title="Delete">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    </button>
+                `;
+                drawerList.appendChild(item);
+            });
         }
-        
-        item.innerHTML = `
-            <div class="onboarding-resume-info">
-                <span class="onboarding-resume-name" title="${resume.filename}">${resume.filename}</span>
-                <span class="status-badge ${badgeClass}" style="margin-top: 3px;">${badgeText}</span>
-            </div>
-            <button class="icon-btn" onclick="deleteResume(${resume.id})" style="color: var(--error-color); border-color: transparent;" title="Delete">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-            </button>
-        `;
-        listContainer.appendChild(item);
-    });
+    }
 }
 
 function selectResumeForAttachment(id) {
@@ -462,6 +600,10 @@ function triggerOnboardingResumeUpload() {
     document.getElementById('onboarding-resume-selector').click();
 }
 
+function triggerDrawerResumeUpload() {
+    document.getElementById('drawer-resume-selector').click();
+}
+
 async function handleResumeFileSelected(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -470,6 +612,13 @@ async function handleResumeFileSelected(event) {
 }
 
 async function handleOnboardingResumeSelected(event) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    await handleOnboardingFiles(files);
+    event.target.value = "";
+}
+
+async function handleDrawerResumeSelected(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     await handleOnboardingFiles(files);
@@ -620,10 +769,8 @@ async function streamEmailResponse(subjectText, bodyText) {
         editorTextarea.value = currentText;
         previewContent.innerHTML = renderMarkdown(currentText);
         
-        // Keep scrolling to the bottom during generation stream
         previewContent.scrollTop = previewContent.scrollHeight;
         
-        // Typewriter delay
         await new Promise(r => setTimeout(r, 18));
     }
     
