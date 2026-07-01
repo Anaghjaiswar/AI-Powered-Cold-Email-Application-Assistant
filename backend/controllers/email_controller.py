@@ -5,7 +5,7 @@ import models
 from schemas import GenerateEmailRequest, SendEmailRequest
 from llm_engine import LLMEngine
 from email_service import EmailService
-from doc_processing_engine import shared_embeddings
+from doc_processing_engine import get_shared_embeddings
 
 class EmailController:
     """Controller handling business logic for generating email drafts and queueing emails for SMTP sending."""
@@ -41,7 +41,7 @@ class EmailController:
 
         # 3. Embed the Job Description using the shared embeddings model
         try:
-            query_vector = shared_embeddings.embed_query(req.job_description)
+            query_vector = get_shared_embeddings().embed_query(req.job_description)
         except Exception as e:
             raise HTTPException(
                 status_code=500,

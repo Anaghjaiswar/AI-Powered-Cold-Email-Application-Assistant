@@ -1,3 +1,5 @@
+# import typing
+# import numpy
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -11,6 +13,22 @@ async def lifespan(app: FastAPI):
     # Run database initialization on startup
     try:
         init_db()
+        # Clean up any resumes stuck in "processing" state from an interrupted previous session
+        from database import SessionLocal
+        import models
+        db = SessionLocal()
+        try:
+            stuck_resumes = db.query(models.Resume).filter(models.Resume.status == "processing").all()
+            if stuck_resumes:
+                print(f"Cleaning up {len(stuck_resumes)} resumes stuck in processing state...")
+                for r in stuck_resumes:
+                    r.status = "failed"
+                    r.error_message = "Ingestion interrupted by server restart."
+                db.commit()
+        except Exception as db_err:
+            print(f"Warning: Could not clean up stuck processing states: {db_err}")
+        finally:
+            db.close()
     except Exception as e:
         print(f"Warning: Could not initialize database: {e}")
     yield

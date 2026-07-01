@@ -31,14 +31,46 @@ class EmailService:
         sender_email = settings.sender_email
         sender_password = settings.sender_app_password
 
-        # 2. Build the multi-part email structure
-        msg = MIMEMultipart()
+        # 2. Build the multi-part email structure (mixed for attachments)
+        msg = MIMEMultipart("mixed")
         msg["From"] = sender_email
         msg["To"] = recipient_email
         msg["Subject"] = subject
 
-        # Attach email body text
-        msg.attach(MIMEText(body, "plain"))
+        # Create alternative container for body text formats (plain and html)
+        body_container = MIMEMultipart("alternative")
+        
+        # Attach raw markdown plain text fallback
+        body_container.attach(MIMEText(body, "plain"))
+        
+        # Attach styled HTML compiled from Markdown
+        try:
+            import marko
+            # Convert single newlines into Markdown hard linebreaks (two trailing spaces)
+            # so standard Markdown compiles them as <br> elements instead of merging lines.
+            processed_lines = []
+            for line in body.split("\n"):
+                if line.strip() and not line.endswith("  ") and not line.strip().startswith("```"):
+                    processed_lines.append(line + "  ")
+                else:
+                    processed_lines.append(line)
+            processed_body = "\n".join(processed_lines)
+            
+            html_body = marko.convert(processed_body)
+            # Clean styling to match modern professional emails
+            styled_html = f"""
+            <html>
+                <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #222222; margin: 0; padding: 0; text-align: left;">
+                    {html_body}
+                </body>
+            </html>
+            """
+            body_container.attach(MIMEText(styled_html, "html"))
+        except Exception as html_err:
+            # Fallback to plain text if HTML compilation fails
+            print(f"Warning: Failed to compile HTML email body: {html_err}")
+            
+        msg.attach(body_container)
 
         # 3. Read and attach PDF file if resume_id is provided
         if resume_id is not None:

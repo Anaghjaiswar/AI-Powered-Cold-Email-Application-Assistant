@@ -1,11 +1,7 @@
 import os
 from typing import List, Tuple, Optional
-from docling.document_converter import DocumentConverter
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-
-
 
 class DocProcessingEngine:
     """Document processing engine for RAG (Retrieval-Augmented Generation) applications.
@@ -18,9 +14,12 @@ class DocProcessingEngine:
 
     def __init__(
         self,
-        embeddings: Optional[HuggingFaceEmbeddings] = None,
+        embeddings: Optional[object] = None,
     ) -> None:
         """Initializes the DocProcessingEngine with conversion, splitting, and embedding configurations."""
+        from docling.document_converter import DocumentConverter
+        from langchain_huggingface import HuggingFaceEmbeddings
+        
         self.converter: DocumentConverter = DocumentConverter()
         
         self.headers_to_split_on: List[Tuple[str, str]] = [
@@ -39,7 +38,7 @@ class DocProcessingEngine:
             separators=["\n\n", "\n", " ", ""]
         )
         
-        self.embeddings: HuggingFaceEmbeddings = embeddings or HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        self.embeddings = embeddings or HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
     def convert_to_markdown(self, pdf_path: str) -> str:
         """Converts a PDF document to a structured Markdown format."""
@@ -96,9 +95,22 @@ class DocProcessingEngine:
         self.save_to_postgres(db_session, resume_id, final_chunks)
 
 
-# Load the embeddings model globally on startup (Singleton pattern)
-# This prevents the CPU-heavy model weights from being reloaded on every request
-shared_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-doc_processor = DocProcessingEngine(embeddings=shared_embeddings)
+# Load the embeddings model and doc processor lazily (Singleton pattern)
+# This prevents model weights and opencv (cv2) from being loaded on supervisor startup
+_shared_embeddings = None
+_doc_processor = None
+
+def get_shared_embeddings():
+    global _shared_embeddings
+    if _shared_embeddings is None:
+        from langchain_huggingface import HuggingFaceEmbeddings
+        _shared_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return _shared_embeddings
+
+def get_doc_processor():
+    global _doc_processor
+    if _doc_processor is None:
+        _doc_processor = DocProcessingEngine(embeddings=get_shared_embeddings())
+    return _doc_processor
 
 
