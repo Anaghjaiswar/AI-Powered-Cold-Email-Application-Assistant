@@ -48,22 +48,42 @@ class EmailController:
                 detail=f"Failed to generate query embedding: {str(e)}"
             )
 
-        # 4. Query pgvector for the top 8 chunks matching the job description across all completed resumes
-        chunks = (
-            db.query(models.ResumeEmbedding)
+        # 4. Find the most relevant resume based on the closest matching chunk
+        best_match = (
+            db.query(models.ResumeEmbedding.resume_id)
             .join(models.Resume)
             .filter(models.Resume.status == "completed")
             .order_by(models.ResumeEmbedding.embedding.cosine_distance(query_vector))
-            .limit(8)
+            .first()
+        )
+        
+        if not best_match:
+            # Fallback to the first completed resume if no vector match found
+            fallback_resume = db.query(models.Resume).filter(models.Resume.status == "completed").first()
+            if not fallback_resume:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not retrieve matching skills context. Please ensure your resumes are uploaded successfully."
+                )
+            best_resume_id = fallback_resume.id
+        else:
+            best_resume_id = best_match[0]
+            
+        # Retrieve ALL chunks for this specific resume in sequential order to preserve full context
+        all_chunks = (
+            db.query(models.ResumeEmbedding)
+            .filter(models.ResumeEmbedding.resume_id == best_resume_id)
+            .order_by(models.ResumeEmbedding.chunk_index)
             .all()
         )
-        if not chunks:
+        if not all_chunks:
             raise HTTPException(
                 status_code=400,
-                detail="Could not retrieve matching skills context. Please ensure your resumes are uploaded successfully."
+                detail="Could not retrieve resume content. Please ensure your resumes are uploaded successfully."
             )
         
-        resume_text = "\n\n".join([chunk.content for chunk in chunks])
+        resume_text = "\n\n".join([chunk.content for chunk in all_chunks])
+
 
         # 4. Set up parameters and trigger generation
         footer_context = settings.email_footer or ""

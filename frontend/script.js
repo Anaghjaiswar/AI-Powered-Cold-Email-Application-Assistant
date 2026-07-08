@@ -263,7 +263,7 @@ function setupEventListeners() {
 // --- SETTINGS CONTROLLER ACTIONS ---
 async function fetchUserSettings() {
     try {
-        const res = await fetch('/api/settings');
+        const res = await fetch(`/api/settings?t=${Date.now()}`);
         if (!res.ok) throw new Error("Could not fetch user configuration.");
         
         const data = await res.json();
@@ -410,7 +410,7 @@ function closeDrawer() {
 // --- RESUME CONTROLLER ACTIONS ---
 async function fetchAndRenderResumes() {
     try {
-        const res = await fetch('/api/resumes');
+        const res = await fetch(`/api/resumes?t=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to load resumes list.");
         
         const resumes = await res.json();
